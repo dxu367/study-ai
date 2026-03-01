@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── NextAuth Models ──
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+  image          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  courses        Course[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── App Models ──
+
+model Course {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploads       Upload[]
+  flashcardSets FlashcardSet[]
+  questionSets  QuestionSet[]
+}
+
+enum FileType {
+  PDF
+  IMAGE
+  TEXT
+}
+
+enum ContentType {
+  LECTURE_NOTES
+  PREVIOUS_EXAM
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Upload {
+  id               String           @id @default(cuid())
+  fileName         String
+  filePath         String
+  fileType         FileType
+  contentType      ContentType
+  extractedText    String?          @db.Text
+  processingStatus ProcessingStatus @default(PENDING)
+  courseId          String
+  createdAt        DateTime         @default(now())
+
+  course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  flashcardSets FlashcardSet[]
+  questionSets  QuestionSet[]  @relation("QuestionSetSource")
+  styleGuideFor QuestionSet[]  @relation("QuestionSetStyleGuide")
+}
+
+model FlashcardSet {
+  id        String   @id @default(cuid())
+  name      String
+  courseId  String
+  uploadId  String?
+  createdAt DateTime @default(now())
+
+  course    Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  upload    Upload?        @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+  cards     Flashcard[]
+  sessions  StudySession[]
+}
+
+model Flashcard {
+  id        String @id @default(cuid())
+  front     String @db.Text
+  back      String @db.Text
+  setId     String
+
+  set       FlashcardSet      @relation(fields: [setId], references: [id], onDelete: Cascade)
+  responses FlashcardResponse[]
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  SHORT_ANSWER
+}
+
+model QuestionSet {
+  id                 String   @id @default(cuid())
+  name               String
+  courseId            String
+  uploadId           String?
+  styleGuideUploadId String?
+  createdAt          DateTime @default(now())
+
+  course     Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  upload     Upload?       @relation("QuestionSetSource", fields: [uploadId], references: [id], onDelete: SetNull)
+  styleGuide Upload?       @relation("QuestionSetStyleGuide", fields: [styleGuideUploadId], references: [id], onDelete: SetNull)
+  questions  Question[]
+  attempts   TestAttempt[]
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  questionText  String       @db.Text
+  questionType  QuestionType
+  options       String?      @db.Text // JSON array for MC options
+  correctAnswer String       @db.Text
+  explanation   String?      @db.Text
+  setId         String
+
+  set     QuestionSet  @relation(fields: [setId], references: [id], onDelete: Cascade)
+  answers TestAnswer[]
+}
+
+model StudySession {
+  id             String   @id @default(cuid())
+  flashcardSetId String
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+
+  flashcardSet FlashcardSet      @relation(fields: [flashcardSetId], references: [id], onDelete: Cascade)
+  responses    FlashcardResponse[]
+}
+
+model FlashcardResponse {
+  id             String  @id @default(cuid())
+  studySessionId String
+  flashcardId    String
+  known          Boolean
+
+  session   StudySession @relation(fields: [studySessionId], references: [id], onDelete: Cascade)
+  flashcard Flashcard    @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+}
+
+model TestAttempt {
+  id            String    @id @default(cuid())
+  questionSetId String
+  score         Float?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  questionSet QuestionSet  @relation(fields: [questionSetId], references: [id], onDelete: Cascade)
+  answers     TestAnswer[]
+}
+
+model TestAnswer {
+  id            String  @id @default(cuid())
+  testAttemptId String
+  questionId    String
+  userAnswer    String  @db.Text
+  isCorrect     Boolean?
+  aiFeedback    String? @db.Text
+
+  attempt  TestAttempt @relation(fields: [testAttemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
