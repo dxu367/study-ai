@@ -67,9 +67,6 @@ export default async function CourseDetailPage({
             {course.chapters.length} chapters
           </p>
         </div>
-        <Link href={`/courses/${courseId}/upload`}>
-          <Button variant="secondary">Upload Previous Exam</Button>
-        </Link>
       </div>
 
       {/* Chapters */}
