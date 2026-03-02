@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8">
-      <h1 className="text-4xl font-bold mb-4">NLP Study Assistant</h1>
+      <h1 className="text-4xl font-bold mb-4">StudyAI</h1>
       <p className="text-lg text-gray-600 mb-8 text-center max-w-lg">
         Upload your lecture notes and previous exams, then use AI to generate
         flashcards and practice tests.

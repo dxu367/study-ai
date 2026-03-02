@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 interface FileUploadZoneProps {
   courseId: string;
   contentType: "LECTURE_NOTES" | "PREVIOUS_EXAM";
+  chapterId?: string;
   onUploaded: () => void;
 }
 
-export function FileUploadZone({ courseId, contentType, onUploaded }: FileUploadZoneProps) {
+export function FileUploadZone({ courseId, contentType, chapterId, onUploaded }: FileUploadZoneProps) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -23,6 +24,7 @@ export function FileUploadZone({ courseId, contentType, onUploaded }: FileUpload
     formData.append("file", file);
     formData.append("courseId", courseId);
     formData.append("contentType", contentType);
+    if (chapterId) formData.append("chapterId", chapterId);
 
     try {
       const res = await fetch("/api/uploads", { method: "POST", body: formData });

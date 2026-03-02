@@ -64,7 +64,8 @@ async function generateFromChunk(
       const textBlock = response.content.find((b) => b.type === "text");
       if (!textBlock || textBlock.type !== "text") throw new Error("No text response");
 
-      const parsed = JSON.parse(textBlock.text);
+      const jsonText = textBlock.text.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "");
+      const parsed = JSON.parse(jsonText);
       return parsed.questions as GeneratedQuestion[];
     } catch (e) {
       if (attempt === 1) throw e;

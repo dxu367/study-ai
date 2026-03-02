@@ -15,17 +15,33 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = generateQuestionsSchema.parse(body);
 
-    const upload = await prisma.upload.findFirst({
+    // Verify all chapters belong to user's course
+    const chapters = await prisma.chapter.findMany({
       where: {
-        id: data.uploadId,
+        id: { in: data.chapterIds },
         course: { id: data.courseId, userId },
-        processingStatus: "COMPLETED",
       },
     });
 
-    if (!upload || !upload.extractedText) {
-      return NextResponse.json({ error: "Upload not found or not processed" }, { status: 404 });
+    if (chapters.length !== data.chapterIds.length) {
+      return NextResponse.json({ error: "One or more chapters not found" }, { status: 404 });
     }
+
+    // Fetch all completed lecture notes uploads across those chapters
+    const uploads = await prisma.upload.findMany({
+      where: {
+        chapterId: { in: data.chapterIds },
+        contentType: "LECTURE_NOTES",
+        processingStatus: "COMPLETED",
+        extractedText: { not: null },
+      },
+    });
+
+    if (uploads.length === 0) {
+      return NextResponse.json({ error: "No processed lecture notes found in selected chapters" }, { status: 404 });
+    }
+
+    const combinedText = uploads.map((u) => u.extractedText!).join("\n\n---\n\n");
 
     // Get style guide text if provided
     let styleGuideText: string | undefined;
@@ -44,17 +60,17 @@ export async function POST(req: Request) {
     }
 
     const questions = await generateQuestions(
-      upload.extractedText,
+      combinedText,
       data.count,
       data.questionTypes,
       styleGuideText
     );
 
+    const chapterNames = chapters.map((c) => c.name).join(", ");
     const questionSet = await prisma.questionSet.create({
       data: {
-        name: `Test from ${upload.fileName}`,
+        name: `Test from ${chapterNames}`,
         courseId: data.courseId,
-        uploadId: data.uploadId,
         styleGuideUploadId: data.styleGuideUploadId || null,
         questions: {
           create: questions.map((q) => ({

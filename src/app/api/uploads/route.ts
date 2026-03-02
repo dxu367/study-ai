@@ -25,8 +25,14 @@ export async function GET(req: Request) {
   const courseId = searchParams.get("courseId");
   if (!courseId) return NextResponse.json({ error: "courseId required" }, { status: 400 });
 
+  const chapterId = searchParams.get("chapterId");
+
   const uploads = await prisma.upload.findMany({
-    where: { courseId, course: { userId } },
+    where: {
+      courseId,
+      course: { userId },
+      ...(chapterId ? { chapterId } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -42,6 +48,7 @@ export async function POST(req: Request) {
   const file = formData.get("file") as File | null;
   const courseId = formData.get("courseId") as string | null;
   const contentType = formData.get("contentType") as string | null;
+  const chapterId = formData.get("chapterId") as string | null;
 
   if (!file || !courseId || !contentType) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -68,6 +75,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
 
+  // Validate chapterId belongs to this course if provided
+  if (chapterId) {
+    const chapter = await prisma.chapter.findFirst({
+      where: { id: chapterId, courseId },
+    });
+    if (!chapter) {
+      return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
+    }
+  }
+
   // Save file
   const uploadDir = path.join(process.cwd(), "public", "uploads", courseId);
   await mkdir(uploadDir, { recursive: true });
@@ -87,6 +104,7 @@ export async function POST(req: Request) {
       fileType: fileType as "PDF" | "IMAGE" | "TEXT",
       contentType: contentType as "LECTURE_NOTES" | "PREVIOUS_EXAM",
       courseId,
+      chapterId,
     },
   });
 

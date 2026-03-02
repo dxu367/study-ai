@@ -40,6 +40,7 @@ RULES:
 - MC distractors should be plausible
 - SA questions should require 1-3 sentence answers
 - Cover diverse topics from the material
+- NEVER create "select all that apply" questions. Each MC question must have exactly ONE correct answer.
 
 {styleGuide}
 

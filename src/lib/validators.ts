@@ -10,15 +10,20 @@ export const courseSchema = z.object({
   name: z.string().min(1, "Course name is required").max(100),
 });
 
+export const chapterSchema = z.object({
+  courseId: z.string().min(1),
+  name: z.string().min(1, "Chapter name is required").max(200),
+});
+
 export const generateFlashcardsSchema = z.object({
   courseId: z.string().min(1),
-  uploadId: z.string().min(1),
+  chapterId: z.string().min(1),
   count: z.number().min(5).max(50).default(20),
 });
 
 export const generateQuestionsSchema = z.object({
   courseId: z.string().min(1),
-  uploadId: z.string().min(1),
+  chapterIds: z.array(z.string().min(1)).min(1),
   count: z.number().min(5).max(30).default(15),
   questionTypes: z
     .array(z.enum(["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER"]))

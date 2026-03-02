@@ -15,26 +15,41 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = generateFlashcardsSchema.parse(body);
 
-    // Verify ownership
-    const upload = await prisma.upload.findFirst({
+    // Verify chapter belongs to user's course
+    const chapter = await prisma.chapter.findFirst({
       where: {
-        id: data.uploadId,
+        id: data.chapterId,
         course: { id: data.courseId, userId },
-        processingStatus: "COMPLETED",
       },
     });
 
-    if (!upload || !upload.extractedText) {
-      return NextResponse.json({ error: "Upload not found or not processed" }, { status: 404 });
+    if (!chapter) {
+      return NextResponse.json({ error: "Chapter not found" }, { status: 404 });
     }
 
-    const cards = await generateFlashcards(upload.extractedText, data.count);
+    // Fetch all completed lecture notes uploads for this chapter
+    const uploads = await prisma.upload.findMany({
+      where: {
+        chapterId: data.chapterId,
+        contentType: "LECTURE_NOTES",
+        processingStatus: "COMPLETED",
+        extractedText: { not: null },
+      },
+    });
+
+    if (uploads.length === 0) {
+      return NextResponse.json({ error: "No processed lecture notes found in this chapter" }, { status: 404 });
+    }
+
+    const combinedText = uploads.map((u) => u.extractedText!).join("\n\n---\n\n");
+
+    const cards = await generateFlashcards(combinedText, data.count);
 
     const flashcardSet = await prisma.flashcardSet.create({
       data: {
-        name: `Flashcards from ${upload.fileName}`,
+        name: `Flashcards from ${chapter.name}`,
         courseId: data.courseId,
-        uploadId: data.uploadId,
+        chapterId: data.chapterId,
         cards: {
           create: cards.map((card) => ({
             front: card.front,

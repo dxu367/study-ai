@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GenerateOptions } from "@/components/generate/generate-options";
+import { AddChapterForm } from "./add-chapter-form";
 
 export default async function CourseDetailPage({
   params,
@@ -21,9 +22,18 @@ export default async function CourseDetailPage({
   const course = await prisma.course.findFirst({
     where: { id: courseId, userId },
     include: {
-      uploads: { orderBy: { createdAt: "desc" } },
-      flashcardSets: {
-        include: { _count: { select: { cards: true } } },
+      chapters: {
+        orderBy: { order: "asc" },
+        include: {
+          _count: { select: { uploads: true, flashcardSets: true } },
+          uploads: {
+            where: { processingStatus: "COMPLETED", contentType: "LECTURE_NOTES" },
+            select: { id: true },
+          },
+        },
+      },
+      uploads: {
+        where: { contentType: "PREVIOUS_EXAM" },
         orderBy: { createdAt: "desc" },
       },
       questionSets: {
@@ -35,36 +45,80 @@ export default async function CourseDetailPage({
 
   if (!course) notFound();
 
-  const processedUploads = course.uploads.filter(
-    (u) => u.processingStatus === "COMPLETED" && u.contentType === "LECTURE_NOTES"
-  );
   const examUploads = course.uploads.filter(
-    (u) => u.processingStatus === "COMPLETED" && u.contentType === "PREVIOUS_EXAM"
+    (u) => u.processingStatus === "COMPLETED"
   );
+
+  const chaptersForGenerate = course.chapters.map((c) => ({
+    id: c.id,
+    name: c.name,
+    hasProcessedUploads: c.uploads.length > 0,
+  }));
+
+  const hasAnyProcessedChapterUploads = chaptersForGenerate.some((c) => c.hasProcessedUploads);
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">{course.name}</h1>
-          <p className="text-gray-500">{course.uploads.length} uploads</p>
+          <p className="text-gray-500">
+            {course.chapters.length} chapters
+          </p>
         </div>
         <Link href={`/courses/${courseId}/upload`}>
-          <Button>Upload Files</Button>
+          <Button variant="secondary">Upload Previous Exam</Button>
         </Link>
       </div>
 
-      {/* Uploads */}
+      {/* Chapters */}
       <Card>
         <CardHeader>
-          <h2 className="font-semibold">Uploads</h2>
+          <h2 className="font-semibold">Chapters</h2>
+        </CardHeader>
+        <CardContent>
+          {course.chapters.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-4">
+              No chapters yet. Add one to get started.
+            </p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {course.chapters.map((chapter) => (
+                <Link
+                  key={chapter.id}
+                  href={`/courses/${courseId}/chapters/${chapter.id}`}
+                  className="block"
+                >
+                  <div className="py-3 flex items-center justify-between hover:bg-gray-50 rounded-lg px-2 transition">
+                    <div>
+                      <p className="text-sm font-medium">{chapter.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {chapter._count.uploads} notes, {chapter._count.flashcardSets} flashcard sets
+                      </p>
+                    </div>
+                    <span className="text-gray-400 text-sm">View &rarr;</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <AddChapterForm courseId={courseId} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Previous Exams */}
+      <Card>
+        <CardHeader>
+          <h2 className="font-semibold">Previous Exams</h2>
         </CardHeader>
         <CardContent>
           {course.uploads.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-4">
-              No files uploaded yet.{" "}
+              No previous exams uploaded.{" "}
               <Link href={`/courses/${courseId}/upload`} className="text-blue-600 hover:underline">
-                Upload some
+                Upload one
               </Link>
             </p>
           ) : (
@@ -75,12 +129,7 @@ export default async function CourseDetailPage({
                     <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-500">
                       {upload.fileType === "PDF" ? "PDF" : upload.fileType === "IMAGE" ? "IMG" : "TXT"}
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{upload.fileName}</p>
-                      <p className="text-xs text-gray-500">
-                        {upload.contentType === "LECTURE_NOTES" ? "Lecture Notes" : "Previous Exam"}
-                      </p>
-                    </div>
+                    <p className="text-sm font-medium">{upload.fileName}</p>
                   </div>
                   <Badge
                     variant={
@@ -100,50 +149,16 @@ export default async function CourseDetailPage({
         </CardContent>
       </Card>
 
-      {/* Generate Section */}
-      {processedUploads.length > 0 && (
+      {/* Generate Practice Test */}
+      {hasAnyProcessedChapterUploads && (
         <GenerateOptions
           courseId={courseId}
-          uploads={processedUploads.map((u) => ({ id: u.id, fileName: u.fileName }))}
+          chapters={chaptersForGenerate}
           examUploads={examUploads.map((u) => ({ id: u.id, fileName: u.fileName }))}
         />
       )}
 
-      {/* Flashcard Sets */}
-      <Card>
-        <CardHeader>
-          <h2 className="font-semibold">Flashcard Sets</h2>
-        </CardHeader>
-        <CardContent>
-          {course.flashcardSets.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-4">
-              No flashcard sets yet. Generate some from your uploads above.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {course.flashcardSets.map((set) => (
-                <Link
-                  key={set.id}
-                  href={`/courses/${courseId}/flashcards/${set.id}/study`}
-                  className="block"
-                >
-                  <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition">
-                    <div>
-                      <p className="text-sm font-medium">{set.name}</p>
-                      <p className="text-xs text-gray-500">{set._count.cards} cards</p>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      Study
-                    </Button>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Question Sets */}
+      {/* Practice Tests */}
       <Card>
         <CardHeader>
           <h2 className="font-semibold">Practice Tests</h2>
@@ -151,7 +166,7 @@ export default async function CourseDetailPage({
         <CardContent>
           {course.questionSets.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-4">
-              No practice tests yet. Generate some from your uploads above.
+              No practice tests yet.{hasAnyProcessedChapterUploads && " Generate one from your chapters above."}
             </p>
           ) : (
             <div className="space-y-2">

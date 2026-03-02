@@ -18,7 +18,7 @@ export function Sidebar() {
     <aside className="w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col">
       <div className="px-6 py-5 border-b border-gray-100">
         <Link href="/dashboard" className="text-xl font-bold text-blue-600">
-          NLP Study
+          StudyAI
         </Link>
       </div>
       <nav className="flex-1 px-3 py-4 space-y-1">

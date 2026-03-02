@@ -13,6 +13,27 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleDemo = async () => {
+    setError("");
+    setDemoLoading(true);
+
+    const result = await signIn("credentials", {
+      email: "demo",
+      password: "demo",
+      redirect: false,
+    });
+
+    setDemoLoading(false);
+
+    if (result?.error) {
+      setError("Demo login failed");
+    } else {
+      router.push("/dashboard");
+      router.refresh();
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +61,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold">Sign In</h1>
-          <p className="text-gray-500 mt-1">Welcome back to NLP Study</p>
+          <p className="text-gray-500 mt-1">Welcome back to StudyAI</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -69,6 +90,25 @@ export default function LoginPage() {
             Sign In
           </Button>
         </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-white px-2 text-gray-400">or</span>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          loading={demoLoading}
+          className="w-full"
+          onClick={handleDemo}
+        >
+          Try Demo Account
+        </Button>
 
         <p className="text-center text-sm text-gray-500">
           Don&apos;t have an account?{" "}

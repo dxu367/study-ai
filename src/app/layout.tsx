@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NLP Study Assistant",
+  title: "StudyAI",
   description: "AI-powered flashcards and practice tests from your lecture notes",
 };
 
