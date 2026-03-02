@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GenerateOptions } from "@/components/generate/generate-options";
 import { AddChapterForm } from "./add-chapter-form";
+import { DeleteQuestionSet } from "./delete-question-set";
 
 export default async function CourseDetailPage({
   params,
@@ -181,9 +182,12 @@ export default async function CourseDetailPage({
                       <p className="text-sm font-medium">{set.name}</p>
                       <p className="text-xs text-gray-500">{set._count.questions} questions</p>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      Take Test
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm">
+                        Take Test
+                      </Button>
+                      <DeleteQuestionSet id={set.id} />
+                    </div>
                   </div>
                 </Link>
               ))}
