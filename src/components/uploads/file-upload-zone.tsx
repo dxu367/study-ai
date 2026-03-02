@@ -35,11 +35,6 @@ export function FileUploadZone({ courseId, contentType, chapterId, onUploaded }:
         return;
       }
 
-      const upload = await res.json();
-
-      // Auto-process
-      await fetch(`/api/uploads/${upload.id}/process`, { method: "POST" });
-
       onUploaded();
     } catch {
       setError("Upload failed");

@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getUserId } from "@/lib/get-session";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 
 const ALLOWED_TYPES: Record<string, string> = {
   "application/pdf": "PDF",
@@ -85,28 +83,56 @@ export async function POST(req: Request) {
     }
   }
 
-  // Save file
-  const uploadDir = path.join(process.cwd(), "public", "uploads", courseId);
-  await mkdir(uploadDir, { recursive: true });
-
-  const ext = path.extname(file.name) || `.${file.type.split("/")[1]}`;
-  const fileName = `${Date.now()}${ext}`;
-  const filePath = path.join(uploadDir, fileName);
-  const relativePath = `/uploads/${courseId}/${fileName}`;
-
-  const bytes = await file.arrayBuffer();
-  await writeFile(filePath, Buffer.from(bytes));
-
+  // Create upload record in PENDING state
   const upload = await prisma.upload.create({
     data: {
       fileName: file.name,
-      filePath: relativePath,
+      filePath: "",
       fileType: fileType as "PDF" | "IMAGE" | "TEXT",
       contentType: contentType as "LECTURE_NOTES" | "PREVIOUS_EXAM",
+      processingStatus: "PROCESSING",
       courseId,
       chapterId,
     },
   });
 
-  return NextResponse.json(upload, { status: 201 });
+  // Extract text in-memory (no disk writes)
+  try {
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    let extractedText = "";
+
+    switch (fileType) {
+      case "PDF": {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pdf = require("pdf-parse");
+        const data = await pdf(buffer);
+        extractedText = data.text.trim();
+        break;
+      }
+      case "IMAGE": {
+        const { extractImageTextFromBuffer } = await import("@/lib/files/extract-image");
+        extractedText = await extractImageTextFromBuffer(buffer, file.type);
+        break;
+      }
+      case "TEXT": {
+        extractedText = buffer.toString("utf-8").trim();
+        break;
+      }
+    }
+
+    const updated = await prisma.upload.update({
+      where: { id: upload.id },
+      data: { extractedText, processingStatus: "COMPLETED" },
+    });
+
+    return NextResponse.json(updated, { status: 201 });
+  } catch (error) {
+    console.error("Processing failed:", error);
+    await prisma.upload.update({
+      where: { id: upload.id },
+      data: { processingStatus: "FAILED" },
+    });
+    return NextResponse.json(upload, { status: 201 });
+  }
 }

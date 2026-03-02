@@ -2,19 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { anthropic } from "@/lib/ai/client";
 
-export async function extractImageText(filePath: string): Promise<string> {
-  const absolutePath = path.join(process.cwd(), "public", filePath);
-  const buffer = await readFile(absolutePath);
-  const base64 = buffer.toString("base64");
-
-  const ext = path.extname(filePath).toLowerCase();
-  const mediaType =
-    ext === ".png"
-      ? "image/png"
-      : ext === ".webp"
-        ? "image/webp"
-        : "image/jpeg";
-
+async function callVisionApi(base64: string, mediaType: "image/png" | "image/webp" | "image/jpeg"): Promise<string> {
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 4096,
@@ -41,4 +29,31 @@ export async function extractImageText(filePath: string): Promise<string> {
 
   const textBlock = response.content.find((block) => block.type === "text");
   return textBlock ? textBlock.text : "";
+}
+
+export async function extractImageTextFromBuffer(buffer: Buffer, mimeType: string): Promise<string> {
+  const base64 = buffer.toString("base64");
+  const mediaType = mimeType === "image/png"
+    ? "image/png"
+    : mimeType === "image/webp"
+      ? "image/webp"
+      : "image/jpeg";
+
+  return callVisionApi(base64, mediaType as "image/png" | "image/webp" | "image/jpeg");
+}
+
+export async function extractImageText(filePath: string): Promise<string> {
+  const absolutePath = path.join(process.cwd(), "public", filePath);
+  const buffer = await readFile(absolutePath);
+  const base64 = buffer.toString("base64");
+
+  const ext = path.extname(filePath).toLowerCase();
+  const mediaType =
+    ext === ".png"
+      ? "image/png"
+      : ext === ".webp"
+        ? "image/webp"
+        : "image/jpeg";
+
+  return callVisionApi(base64, mediaType);
 }
